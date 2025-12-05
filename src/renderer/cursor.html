@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Cursor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: transparent;
+      overflow: hidden;
+    }
+    #cursor {
+      width: 30px;
+      height: 30px;
+      position: relative;
+      transform: translate3d(0, 0, 0);
+      will-change: transform;
+    }
+    .cursor-ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 24px;
+      height: 24px;
+      border: 2px solid rgba(79, 70, 229, 0.5);
+      border-radius: 50%;
+      transition: all 0.15s ease-out;
+    }
+    .cursor-dot {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 6px;
+      height: 6px;
+      background: #4f46e5;
+      border-radius: 50%;
+      transition: all 0.15s ease-out;
+    }
+    /* Left click (index pinch) - purple */
+    #cursor.pinching .cursor-ring {
+      width: 18px;
+      height: 18px;
+      border-color: #4f46e5;
+      background: rgba(79, 70, 229, 0.2);
+    }
+    #cursor.pinching .cursor-dot {
+      background: #4f46e5;
+    }
+    /* Right click (middle pinch) - orange */
+    #cursor.right-pinching .cursor-ring {
+      width: 18px;
+      height: 18px;
+      border-color: #f97316;
+      background: rgba(249, 115, 22, 0.2);
+    }
+    #cursor.right-pinching .cursor-dot {
+      background: #f97316;
+    }
+    /* Dragging - pink */
+    #cursor.dragging .cursor-ring {
+      border-color: #ec4899;
+      width: 18px;
+      height: 18px;
+      background: rgba(236, 72, 153, 0.1);
+    }
+    #cursor.dragging .cursor-dot {
+      background: #ec4899;
+    }
+  </style>
+</head>
+<body>
+  <div id="cursor">
+    <div class="cursor-ring"></div>
+    <div class="cursor-dot"></div>
+  </div>
+  <script>
+    const cursor = document.getElementById('cursor');
+    let visible = true; // Start visible
+
+    if (window.electronAPI) {
+      window.electronAPI.onCursorUpdate((x, y, state) => {
+        if (visible) {
+          // Window is already positioned, so transform should be relative (centered)
+          cursor.style.transform = `translate3d(0, 0, 0)`;
+          cursor.className = state || '';
+        }
+      });
+
+      window.electronAPI.onCursorVisibility((vis) => {
+        visible = vis;
+        cursor.style.display = vis ? 'block' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>
