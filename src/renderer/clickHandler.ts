@@ -1,5 +1,5 @@
 // clickHandler.ts
-// Handles click, double-click, right-click, and scroll interactions
+// Handles click, double-click, right-click, swipe, and scroll interactions
 
 export type GestureType = 'none' | 'left-pinch' | 'right-pinch';
 
@@ -17,19 +17,63 @@ export class ClickHandler {
   private lastLeftClickPos: { x: number; y: number } | null = null;
   private doubleClickThreshold: number = 400; // ms between clicks for double-click
   private doubleClickDistance: number = 30; // max distance between clicks
+  
+  // Swipe detection (for presentation mode)
+  private swipeEnabled: boolean = true;
+  private swipeHistory: { x: number; y: number; time: number }[] = [];
+  private swipeThreshold: number = 150; // pixels
+  private swipeTimeWindow: number = 300; // ms
+  private lastSwipeTime: number = 0;
+  private swipeCooldown: number = 500; // ms between swipes
 
   constructor(dragThreshold: number = 40, scrollSpeed: number = 2.0) {
     this.dragThreshold = dragThreshold;
     this.scrollSpeed = scrollSpeed;
   }
 
+  setSwipeEnabled(enabled: boolean): void {
+    this.swipeEnabled = enabled;
+  }
+
   handleInteraction(
     x: number,
     y: number,
     gesture: GestureType,
-    onDragStateChange: (isDragging: boolean) => void
+    onDragStateChange: (isDragging: boolean) => void,
+    onSwipe?: (direction: 'left' | 'right') => void
   ): void {
     const isPinching = gesture !== 'none';
+    const now = Date.now();
+    
+    // Track position for swipe detection (only when not pinching)
+    if (!isPinching && this.swipeEnabled) {
+      this.swipeHistory.push({ x, y, time: now });
+      // Keep only recent history
+      this.swipeHistory = this.swipeHistory.filter(p => now - p.time < this.swipeTimeWindow);
+      
+      // Detect swipe
+      if (this.swipeHistory.length >= 5 && now - this.lastSwipeTime > this.swipeCooldown) {
+        const oldest = this.swipeHistory[0];
+        const newest = this.swipeHistory[this.swipeHistory.length - 1];
+        const dx = newest.x - oldest.x;
+        const dy = Math.abs(newest.y - oldest.y);
+        const timeDiff = newest.time - oldest.time;
+        
+        // Horizontal swipe: significant X movement, minimal Y movement, fast enough
+        if (Math.abs(dx) > this.swipeThreshold && dy < 80 && timeDiff < this.swipeTimeWindow) {
+          const direction = dx > 0 ? 'right' : 'left';
+          console.log(`[ClickHandler] Swipe detected: ${direction}`);
+          this.lastSwipeTime = now;
+          this.swipeHistory = []; // Clear history after swipe
+          if (onSwipe) {
+            onSwipe(direction);
+          }
+        }
+      }
+    } else {
+      // Clear swipe history when pinching
+      this.swipeHistory = [];
+    }
     
     // Hover simulation
     const el = document.elementFromPoint(x, y);
@@ -86,8 +130,8 @@ export class ClickHandler {
       if (prevState === 'pinching' && this.pinchStart) {
         if (prevGesture === 'left-pinch') {
           // Left click logic with double-click detection
-          const now = Date.now();
-          const timeSinceLastClick = now - this.lastLeftClickTime;
+          const clickNow = Date.now();
+          const timeSinceLastClick = clickNow - this.lastLeftClickTime;
           const distFromLastClick = this.lastLeftClickPos 
             ? Math.hypot(x - this.lastLeftClickPos.x, y - this.lastLeftClickPos.y)
             : Infinity;
@@ -102,7 +146,7 @@ export class ClickHandler {
             // Single left click
             console.log('[ClickHandler] Left pinch released - performing click at', x, y);
             this.performSystemClick(x, y);
-            this.lastLeftClickTime = now;
+            this.lastLeftClickTime = clickNow;
             this.lastLeftClickPos = { x, y };
           }
         } else if (prevGesture === 'right-pinch') {
@@ -165,6 +209,7 @@ export class ClickHandler {
     this.lastHovered = null;
     this.lastLeftClickTime = 0;
     this.lastLeftClickPos = null;
+    this.swipeHistory = [];
     document.body.style.userSelect = '';
   }
 }

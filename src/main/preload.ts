@@ -23,6 +23,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimizeWindow: () => {
     ipcRenderer.send('window-minimize');
   },
+  toggleMiniMode: () => {
+    ipcRenderer.send('toggle-mini-mode');
+  },
+  getMiniMode: () => {
+    return ipcRenderer.invoke('get-mini-mode');
+  },
+  onMiniModeChanged: (callback: (isMini: boolean) => void) => {
+    ipcRenderer.on('mini-mode-changed', (event, isMini) => callback(isMini));
+  },
   getMediaPipePath: () => {
     return ipcRenderer.invoke('get-mediapipe-path');
   },
@@ -37,6 +46,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   performRightClick: (x: number, y: number) => {
     console.log('[Preload] Sending perform-right-click IPC:', x, y);
     ipcRenderer.send('perform-right-click', x, y);
+  },
+  sendKey: (key: string) => {
+    console.log('[Preload] Sending key:', key);
+    ipcRenderer.send('send-key', key);
   },
   requestCameraPermission: async () => {
     return ipcRenderer.invoke('request-camera-permission');

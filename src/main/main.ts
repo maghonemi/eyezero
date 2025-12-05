@@ -16,6 +16,11 @@ try {
 
 let mainWindow: BrowserWindow | null = null;
 let cursorWindow: BrowserWindow | null = null;
+let isMiniMode = false;
+
+// Window sizes
+const FULL_SIZE = { width: 280, height: 340 };
+const MINI_SIZE = { width: 130, height: 110 };
 
 // Ensure the app name is consistent for permissions/bundle identity
 app.setName('EyeZero');
@@ -23,8 +28,8 @@ app.setAboutPanelOptions({ applicationName: 'EyeZero' });
 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 400,
-    height: 600,
+    width: FULL_SIZE.width,
+    height: FULL_SIZE.height,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -46,7 +51,7 @@ function createMainWindow(): void {
 
   // Position window in bottom-right corner
   const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-  mainWindow.setPosition(width - 420, height - 620);
+  mainWindow.setPosition(width - FULL_SIZE.width - 20, height - FULL_SIZE.height - 20);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -302,6 +307,76 @@ ipcMain.on('window-minimize', () => {
     mainWindow.minimize();
   }
 });
+
+// Mini mode toggle
+ipcMain.on('toggle-mini-mode', () => {
+  if (!mainWindow) return;
+  
+  isMiniMode = !isMiniMode;
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  
+  if (isMiniMode) {
+    mainWindow.setSize(MINI_SIZE.width, MINI_SIZE.height);
+    mainWindow.setPosition(width - MINI_SIZE.width - 20, height - MINI_SIZE.height - 20);
+  } else {
+    mainWindow.setSize(FULL_SIZE.width, FULL_SIZE.height);
+    mainWindow.setPosition(width - FULL_SIZE.width - 20, height - FULL_SIZE.height - 20);
+  }
+  
+  mainWindow.webContents.send('mini-mode-changed', isMiniMode);
+  console.log('[Main] Mini mode:', isMiniMode);
+});
+
+ipcMain.handle('get-mini-mode', () => {
+  return isMiniMode;
+});
+
+// Keyboard shortcuts for presentation control
+ipcMain.on('send-key', (event, key: string) => {
+  console.log(`[Main] Sending key: ${key}`);
+  
+  if (robot) {
+    try {
+      robot.keyTap(key);
+      console.log(`[Key] Key ${key} sent with robotjs`);
+    } catch (error: any) {
+      console.error(`[Key] robotjs failed:`, error);
+      sendKeyWithAppleScript(key);
+    }
+  } else {
+    sendKeyWithAppleScript(key);
+  }
+});
+
+function sendKeyWithAppleScript(key: string): void {
+  const { exec } = require('child_process');
+  
+  // Map key names to AppleScript key codes
+  const keyMap: { [key: string]: number } = {
+    'left': 123,   // Left arrow
+    'right': 124,  // Right arrow
+    'up': 126,     // Up arrow
+    'down': 125,   // Down arrow
+    'space': 49,   // Space bar
+    'escape': 53,  // Escape
+  };
+  
+  const keyCode = keyMap[key];
+  if (!keyCode) {
+    console.error(`[Key] Unknown key: ${key}`);
+    return;
+  }
+  
+  const script = `tell application "System Events" to key code ${keyCode}`;
+  
+  exec(`osascript -e '${script}'`, (error: any, stdout: string, stderr: string) => {
+    if (error) {
+      console.error(`[Key] AppleScript error:`, error.message);
+    } else {
+      console.log(`[Key] Key ${key} sent with AppleScript`);
+    }
+  });
+}
 
 ipcMain.handle('get-mediapipe-path', () => {
   return path.join(__dirname, '../assets/mediapipe');
