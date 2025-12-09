@@ -19,8 +19,8 @@ let cursorWindow: BrowserWindow | null = null;
 let isMiniMode = false;
 
 // Window sizes
-const FULL_SIZE = { width: 280, height: 340 };
-const MINI_SIZE = { width: 130, height: 110 };
+const FULL_SIZE = { width: 280, height: 350 };
+const MINI_SIZE = { width: 130, height: 120 };
 
 // Ensure the app name is consistent for permissions/bundle identity
 app.setName('EyeZero');

@@ -141,8 +141,8 @@ export class GestureController {
           <div style="margin-bottom: 12px;">
             <div style="font-weight: 600; color: #f97316; margin-bottom: 6px;">🎯 Slides Mode</div>
             <div style="padding-left: 4px;">
-              <div>👋← Swipe left → Next slide</div>
-              <div>👋→ Swipe right → Prev slide</div>
+              <div>👉 Ring + thumb → Next slide</div>
+              <div>👈 Pinky + thumb → Prev slide</div>
             </div>
           </div>
           <div>
@@ -551,6 +551,16 @@ export class GestureController {
         text.textContent = 'Right-Click';
         indicator.style.background = 'rgba(249, 115, 22, 0.9)';
         break;
+      case 'ring-pinch':
+        icon.textContent = '👉';
+        text.textContent = 'Next';
+        indicator.style.background = 'rgba(59, 130, 246, 0.9)';
+        break;
+      case 'pinky-pinch':
+        icon.textContent = '👈';
+        text.textContent = 'Prev';
+        indicator.style.background = 'rgba(139, 92, 246, 0.9)';
+        break;
       default:
         icon.textContent = '👆';
         text.textContent = 'Moving';
@@ -590,11 +600,13 @@ export class GestureController {
     const index = landmarks[8];
     const middle = landmarks[12];
     const ring = landmarks[16];
+    const pinky = landmarks[20];
 
     // Calculate pinch distances
     const indexThumbDist = Math.hypot(index.x - thumb.x, index.y - thumb.y);
     const middleThumbDist = Math.hypot(middle.x - thumb.x, middle.y - thumb.y);
     const ringThumbDist = Math.hypot(ring.x - thumb.x, ring.y - thumb.y);
+    const pinkyThumbDist = Math.hypot(pinky.x - thumb.x, pinky.y - thumb.y);
     
     // Stricter thresholds for better accuracy
     const pinchThreshold = 0.04; // Tighter threshold
@@ -604,13 +616,19 @@ export class GestureController {
     
     const isIndexPinch = indexThumbDist < pinchThreshold;
     const isMiddlePinch = middleThumbDist < pinchThreshold;
+    const isRingPinch = ringThumbDist < pinchThreshold;
+    const isPinkyPinch = pinkyThumbDist < pinchThreshold;
     
-    // For left click: index must be pinching AND middle must NOT be close
-    // For right click: middle must be pinching AND index must NOT be close
+    // Priority: Check for ring/pinky pinches first (for slide navigation in presentation mode)
+    // Then check for index/middle pinches (for clicks)
     
-    if (isIndexPinch && !isMiddlePinch && middleThumbDist > exclusionThreshold) {
+    if (isRingPinch && !isIndexPinch && !isMiddlePinch && indexThumbDist > exclusionThreshold && middleThumbDist > exclusionThreshold) {
+      rawGesture = 'ring-pinch';
+    } else if (isPinkyPinch && !isIndexPinch && !isMiddlePinch && indexThumbDist > exclusionThreshold && middleThumbDist > exclusionThreshold) {
+      rawGesture = 'pinky-pinch';
+    } else if (isIndexPinch && !isMiddlePinch && middleThumbDist > exclusionThreshold && !isRingPinch && !isPinkyPinch) {
       rawGesture = 'left-pinch';
-    } else if (isMiddlePinch && !isIndexPinch && indexThumbDist > exclusionThreshold) {
+    } else if (isMiddlePinch && !isIndexPinch && indexThumbDist > exclusionThreshold && !isRingPinch && !isPinkyPinch) {
       rawGesture = 'right-pinch';
     } else if (isIndexPinch && isMiddlePinch) {
       // Both pinching - use the closer one, but require significant difference
@@ -654,7 +672,9 @@ export class GestureController {
             (window as any).electronAPI.sendKey('left');
           }
         }
-      }
+      },
+      landmarks, // Pass landmarks for open hand detection and wrist tracking
+      this.presentationMode // Pass presentation mode flag
     );
   }
 }
